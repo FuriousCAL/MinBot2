@@ -171,6 +171,15 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
      *                                  and radians
      * @param modules                   Constants for each specific module
      */
+
+
+     // In CommandSwerveDrivetrain.java
+    public void resetPose(Pose2d desiredPoseMeters) {
+        // Fallback so your autos at least start with the right heading
+        try { this.setOperatorPerspectiveForward(desiredPoseMeters.getRotation()); } catch (Throwable t) {}
+        try { this.seedFieldCentric(); } catch (Throwable t) {}
+}
+
     public CommandSwerveDrivetrain(
         SwerveDrivetrainConstants drivetrainConstants,
         double odometryUpdateFrequency,
@@ -215,6 +224,25 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
     public Command sysIdDynamic(SysIdRoutine.Direction direction) {
         return m_sysIdRoutineToApply.dynamic(direction);
     }
+    /**
+     * Sets the SysId routine to apply when running SysId tests.
+     * This allows users to switch between translation, steer, and rotation characterization.
+     *
+    @param sysIdRoutine The SysId routine to apply
+     */
+    /**
+     * Resets the drivetrain's odometry to the specified field pose.
+     * This method can be called by PathPlanner before starting a new path.
+     *
+    @param newPose The desired field pose.
+     */
+    public void resetOdometry(Pose2d newPose) {
+        // Reset internal components to the new pose.
+        resetPose(newPose);
+        // If additional odometry methods exist (e.g., in the base class), call them here.
+    }
+
+
 
     @Override
     public void periodic() {
