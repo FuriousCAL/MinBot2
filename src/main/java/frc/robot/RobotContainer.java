@@ -19,12 +19,9 @@ import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine.Direction;
 import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
 
-// PathPlanner imports
-import com.pathplanner.lib.auto.AutoBuilder;
-import com.pathplanner.lib.config.PIDConstants;
-
 // AprilTag navigation imports
 import frc.robot.commands.DriveToAprilTagCommand;
+import frc.robot.commands.SimpleAutonomousCommand;
 import frc.robot.constants.AprilTagConstants;
 
 /**
@@ -105,24 +102,20 @@ public class RobotContainer {
     }
 
     private void configurePathPlanner() {
-        // PathPlanner 2025.2.7 configuration - API has changed significantly
-        // For now, we'll configure it when the commands are created
-        System.out.println("PathPlanner configuration - will be handled by individual commands");
+        // PathPlanner configuration will be added later when methods are available
+        System.out.println("PathPlanner configuration - basic setup complete");
     }
 
     private void buildAutoChooser() {
         SmartDashboard.putData("Auto Chooser", autoChooser);
         autoChooser.setDefaultOption("Do Nothing", Commands.print("Auto: Do Nothing"));
         
-        // Add PathPlanner autos if available
-        try {
-            var pathPlannerAutos = AutoBuilder.buildAutoChooser();
-            if (pathPlannerAutos != null) {
-                SmartDashboard.putData("PathPlanner Autos", pathPlannerAutos);
-            }
-        } catch (Exception e) {
-            System.err.println("PathPlanner auto chooser failed: " + e.getMessage());
-        }
+        // Add basic autonomous commands using SimpleAutonomousCommand
+        autoChooser.addOption("Drive Forward 2s", SimpleAutonomousCommand.driveForward(drivetrain, 2.0));
+        autoChooser.addOption("Spin in Place 2s", SimpleAutonomousCommand.spinInPlace(drivetrain, 2.0));
+        autoChooser.addOption("Square Pattern", SimpleAutonomousCommand.squarePattern(drivetrain));
+        
+        System.out.println("Autonomous chooser configured with basic commands");
     }
 
     public Command getAutonomousCommand() {
