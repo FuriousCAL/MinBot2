@@ -21,6 +21,7 @@ import frc.robot.subsystems.CommandSwerveDrivetrain;
 
 // AprilTag navigation imports
 import frc.robot.commands.DriveToAprilTagCommand;
+import frc.robot.commands.DriveToHomeCommand;
 import frc.robot.commands.SimpleAutonomousCommand;
 import frc.robot.constants.AprilTagConstants;
 
@@ -85,6 +86,9 @@ public class RobotContainer {
         joystick.a().onTrue(Commands.runOnce(() -> {
             System.out.println("A Button Pressed - Cancel Navigation (Test)");
         }));
+
+        // Home position navigation - Left Bumper + A button
+        joystick.leftBumper().and(joystick.a()).onTrue(new DriveToHomeCommand(drivetrain));
 
         // Basic brake/point bindings (moved to different buttons)
         joystick.rightBumper().whileTrue(drivetrain.applyRequest(() -> brake));

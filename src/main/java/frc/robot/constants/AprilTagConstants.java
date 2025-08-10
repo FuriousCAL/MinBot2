@@ -139,4 +139,13 @@ public final class AprilTagConstants {
         Units.feetToMeters(13.5), // Center of field Y  
         Rotation2d.fromDegrees(0)
     );
+    
+    /**
+     * Home position where the robot starts and can return to
+     */
+    public static final Pose2d HOME_POSITION = new Pose2d(
+        3.0, // 3 meters X
+        3.0, // 3 meters Y
+        Rotation2d.fromDegrees(0) // Facing forward
+    );
 }
