@@ -52,6 +52,10 @@ public class TunerConstants {
     // The stator current at which the wheels start to slip;
     // This needs to be tuned to your individual robot
     private static final Current kSlipCurrent = Amps.of(120.0);
+    
+    // The frequency at which the odometry loop runs; this is used to update the robot's pose
+    // This should be set to the same frequency as the swerve module's odometry update frequency
+    public static final double kOdometryUpdateFrequency = 250.0; // Hz (CTRE default is 250 Hz)
 
     // Initial configs for the drive and steer motors and the azimuth encoder; these cannot be null.
     // Some configs will be overwritten; check the `with*InitialConfigs()` API documentation.
@@ -204,7 +208,7 @@ public class TunerConstants {
      */
     public static CommandSwerveDrivetrain createDrivetrain() {
         return new CommandSwerveDrivetrain(
-            DrivetrainConstants, FrontLeft, FrontRight, BackLeft, BackRight
+            DrivetrainConstants, kOdometryUpdateFrequency, FrontLeft, FrontRight, BackLeft, BackRight
         );
     }
 

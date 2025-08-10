@@ -13,6 +13,7 @@ import com.ctre.phoenix6.swerve.SwerveRequest;
 import edu.wpi.first.math.Matrix;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
 import edu.wpi.first.wpilibj.DriverStation;
@@ -108,25 +109,8 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
     /* The SysId routine to test */
     private SysIdRoutine m_sysIdRoutineToApply = m_sysIdRoutineTranslation;
 
-    /**
-     * Constructs a CTRE SwerveDrivetrain using the specified constants.
-     * <p>
-     * This constructs the underlying hardware devices, so users should not construct
-     * the devices themselves. If they need the devices, they can access them through
-     * getters in the classes.
-     *
-     * @param drivetrainConstants   Drivetrain-wide constants for the swerve drive
-     * @param modules               Constants for each specific module
-     */
-    public CommandSwerveDrivetrain(
-        SwerveDrivetrainConstants drivetrainConstants,
-        SwerveModuleConstants<?, ?, ?>... modules
-    ) {
-        super(drivetrainConstants, modules);
-        if (Utils.isSimulation()) {
-            startSimThread();
-        }
-    }
+
+ 
 
     /**
      * Constructs a CTRE SwerveDrivetrain using the specified constants.
@@ -173,12 +157,32 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
      */
 
 
-     // In CommandSwerveDrivetrain.java
-    public void resetPose(Pose2d desiredPoseMeters) {
-        // Fallback so your autos at least start with the right heading
-        try { this.setOperatorPerspectiveForward(desiredPoseMeters.getRotation()); } catch (Throwable t) {}
-        try { this.seedFieldCentric(); } catch (Throwable t) {}
+// Add these methods to CommandSwerveDrivetrain.java
+public Pose2d getPose() {
+    return this.getState().Pose;
 }
+
+public void resetPose(Pose2d pose) {
+    try { 
+        this.setOperatorPerspectiveForward(pose.getRotation()); 
+        this.seedFieldCentric();
+    } catch (Throwable t) {
+        try { this.seedFieldCentric(); } catch (Throwable t2) {}
+    }
+}
+
+public ChassisSpeeds getRobotRelativeSpeeds() {
+    return this.getState().Speeds;
+}
+
+public void driveRobotRelative(ChassisSpeeds speeds) {
+    var request = new SwerveRequest.RobotCentric()
+        .withVelocityX(speeds.vxMetersPerSecond)
+        .withVelocityY(speeds.vyMetersPerSecond)
+        .withRotationalRate(speeds.omegaRadiansPerSecond);
+    this.setControl(request);
+}
+
 
     public CommandSwerveDrivetrain(
         SwerveDrivetrainConstants drivetrainConstants,

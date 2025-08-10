@@ -15,16 +15,16 @@ public class SimpleAutonomousCommand {
                 .withRotationalRate(0.0)
         ).withTimeout(seconds);
     }
-    
+
     public static Command spinInPlace(CommandSwerveDrivetrain drivetrain, double seconds) {
         return drivetrain.applyRequest(() -> 
             new SwerveRequest.RobotCentric()
                 .withVelocityX(0.0)
                 .withVelocityY(0.0)
-                .withRotationalRate(1.0) // 1 rad/s rotation
+                .withRotationalRate(1.0)
         ).withTimeout(seconds);
     }
-    
+
     public static Command squarePattern(CommandSwerveDrivetrain drivetrain) {
         return Commands.sequence(
             // Forward
@@ -41,7 +41,7 @@ public class SimpleAutonomousCommand {
                     .withVelocityY(-1.0)
                     .withRotationalRate(0.0)
             ).withTimeout(1.0),
-            // Backward
+            // Back
             drivetrain.applyRequest(() -> 
                 new SwerveRequest.RobotCentric()
                     .withVelocityX(-1.0)
