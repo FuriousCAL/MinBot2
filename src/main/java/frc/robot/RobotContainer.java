@@ -99,9 +99,12 @@ public class RobotContainer {
   private void configurePathPlanner() {
     RobotConfig cfg;
     try {
-      cfg = RobotConfig.fromGUISettings();
+        cfg = RobotConfig.fromGUISettings();
+        System.out.println("[PathPlanner] Successfully loaded config: " + cfg.toString());
     } catch (Exception e) {
-      throw new RuntimeException("Failed to load PathPlanner RobotConfig from GUI settings", e);
+        System.err.println("[PathPlanner] Failed to load config: " + e.getMessage());
+        e.printStackTrace();
+        throw new RuntimeException("Failed to load PathPlanner RobotConfig from GUI settings", e);
     }
 
     AutoBuilder.configure(
@@ -117,7 +120,9 @@ public class RobotContainer {
         () -> DriverStation.getAlliance().orElse(Alliance.Blue) == Alliance.Red,
         drivetrain
     );
-  }
+    
+    System.out.println("[PathPlanner] AutoBuilder configured successfully");
+}
 
   private void createAutoChooser() {
     try {
@@ -134,18 +139,20 @@ public class RobotContainer {
     autoChooser.addOption("Drive Forward 2s", SimpleAutonomousCommand.driveForward(drivetrain, 2.0));
     autoChooser.addOption("Spin In Place 2s", SimpleAutonomousCommand.spinInPlace(drivetrain, 2.0));
     autoChooser.addOption("Square Pattern", SimpleAutonomousCommand.squarePattern(drivetrain));
+    autoChooser.addOption("PathPlanner: TestAuto1", AutoBuilder.buildAuto("TestAuto1"));
     autoChooser.addOption(
-        "PathPlanner: Prefaced Path",
-        Commands.sequence(
-            Commands.print("PathPlanner: Starting preface"),
-            SimpleAutonomousCommand.driveForward(drivetrain, 2.0),
-            Commands.print("PathPlanner: Preface complete")
-        )
-    );
-    autoChooser.addOption(
-        "PathPlanner: Drive to AprilTag 1",
-        new DriveToAprilTagCommand(drivetrain, AprilTagConstants.TagIDs.BLUE_SPEAKER_CENTER)
-    );
+      "PathPlanner: Simple Test",
+      Commands.sequence(
+          Commands.print("PathPlanner: Starting simple test"),
+          Commands.runOnce(() -> {
+              System.out.println("[PathPlanner] Current pose: " + drivetrain.getPose());
+              System.out.println("[PathPlanner] Robot config loaded: " + (AutoBuilder.isConfigured() ? "YES" : "NO"));
+          }),
+          Commands.waitSeconds(1.0),
+          Commands.print("PathPlanner: Simple test complete")
+      )
+  );
+
   }
 
   public Command getAutonomousCommand() {
