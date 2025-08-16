@@ -107,21 +107,36 @@ public class RobotContainer {
         throw new RuntimeException("Failed to load PathPlanner RobotConfig from GUI settings", e);
     }
 
-    AutoBuilder.configure(
-        drivetrain::getPose,
-        drivetrain::resetPose,
-        drivetrain::getRobotRelativeSpeeds,
-        (speeds, ffs) -> drivetrain.driveRobotRelative(speeds),
-        new PPHolonomicDriveController(
-            new PIDConstants(5.0, 0.0, 0.0),
-            new PIDConstants(5.0, 0.0, 0.0)
-        ),
-        cfg,
-        () -> DriverStation.getAlliance().orElse(Alliance.Blue) == Alliance.Red,
-        drivetrain
-    );
-    
-    System.out.println("[PathPlanner] AutoBuilder configured successfully");
+     // Calculate 1/3 speed
+     final double autoSpeedMultiplier = 1.0 / 3.0;
+     final double maxAutoSpeed = MaxSpeed * autoSpeedMultiplier;
+     final double maxAutoAngularRate = MaxAngularRate * autoSpeedMultiplier;
+ 
+
+     AutoBuilder.configure(
+      drivetrain::getPose,
+      drivetrain::resetPose,
+      drivetrain::getRobotRelativeSpeeds,
+      (speeds, ffs) -> {
+          // Apply speed limiting to the chassis speeds
+          ChassisSpeeds limitedSpeeds = new ChassisSpeeds(
+              speeds.vxMetersPerSecond * autoSpeedMultiplier,
+              speeds.vyMetersPerSecond * autoSpeedMultiplier,
+              speeds.omegaRadiansPerSecond * autoSpeedMultiplier
+          );
+          drivetrain.driveRobotRelative(limitedSpeeds);
+      },
+      new PPHolonomicDriveController(
+          new PIDConstants(5.0, 0.0, 0.0),
+          new PIDConstants(5.0, 0.0, 0.0)
+      ),
+      cfg,
+      () -> DriverStation.getAlliance().orElse(Alliance.Blue) == Alliance.Red,
+      drivetrain
+  );
+  
+  System.out.println("[PathPlanner] AutoBuilder configured successfully");
+  System.out.println("[PathPlanner] Auto speed limited to: "
 }
 
   private void createAutoChooser() {
