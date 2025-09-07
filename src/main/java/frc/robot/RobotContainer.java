@@ -2,9 +2,12 @@ package frc.robot;
 
 import static edu.wpi.first.units.Units.*;
 
+import java.util.Set;
+
 import com.ctre.phoenix6.swerve.SwerveModule.DriveRequestType;
 import com.ctre.phoenix6.swerve.SwerveRequest;
 
+import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
@@ -26,6 +29,15 @@ import frc.robot.commands.SimpleAutonomousCommand;
 import frc.robot.constants.AprilTagConstants;
 import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
+import edu.wpi.first.math.MathUtil;
+import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Translation2d;
+import edu.wpi.first.math.geometry.Transform2d;
+
+import com.pathplanner.lib.auto.AutoBuilder; // used below for X/Y moves
+import frc.robot.utils.PathPlannerUtils;      // for default PathPlanner constraints
+import edu.wpi.first.apriltag.AprilTagFields;
 
 public class RobotContainer {
   private final double MaxSpeed = TunerConstants.kSpeedAt12Volts.in(MetersPerSecond);
@@ -45,6 +57,17 @@ public class RobotContainer {
   private final CommandXboxController joystick = new CommandXboxController(0);
 
   private SendableChooser<Command> autoChooser;
+  // Add a Field-Centric request in parallel to Robot-Centric
+  private final SwerveRequest.FieldCentric fieldDrive = new SwerveRequest.FieldCentric()
+    .withDeadband(MaxSpeed * 0.1)
+    .withRotationalDeadband(MaxAngularRate * 0.1)
+    .withDriveRequestType(DriveRequestType.OpenLoopVoltage);
+
+  // Start in field-centric; LB will toggle this
+  private boolean isFieldCentric = true;
+
+  // Safe pose (3, 3, 0°) — reuse your constant
+  private static final Pose2d SAFE_POSE = AprilTagConstants.HOME_POSITION;
 
   public RobotContainer() {
     // 1) PathPlanner hooks
@@ -59,10 +82,27 @@ public class RobotContainer {
 
     // 4) Default teleop drive
     drivetrain.setDefaultCommand(
-        drivetrain.applyRequest(() ->
-            drive.withVelocityX(joystick.getLeftY() * -MaxSpeed)
-                 .withVelocityY(joystick.getLeftX() * -MaxSpeed)
-                 .withRotationalRate(joystick.getRightX() * -MaxAngularRate)));
+      drivetrain.applyRequest(() -> {
+         // Trigger-based speed scaling
+        double precision = 1.0 - 0.7 * joystick.getLeftTriggerAxis();  // 1.0 → 0.3
+        double turbo     = 1.0 + 0.5 * joystick.getRightTriggerAxis(); // 1.0 → 1.5
+        double scale     = MathUtil.clamp(precision * turbo, 0.2, 1.5);
+
+        // Call the concrete request type (avoid the NativeSwerveRequest parent)
+        if (isFieldCentric) {
+          return fieldDrive
+              .withVelocityX(joystick.getLeftY()  * -MaxSpeed         * scale)
+              .withVelocityY(joystick.getLeftX()  * -MaxSpeed         * scale)
+              .withRotationalRate(joystick.getRightX() * -MaxAngularRate * scale);
+        } else {
+          return drive
+              .withVelocityX(joystick.getLeftY()  * -MaxSpeed         * scale)
+              .withVelocityY(joystick.getLeftX()  * -MaxSpeed         * scale)
+              .withRotationalRate(joystick.getRightX() * -MaxAngularRate * scale);
+        }
+      })
+
+    );
 
     // 5) Buttons and SysId
     configureBindings();
@@ -74,27 +114,73 @@ public class RobotContainer {
     drivetrain.registerTelemetry(logger::telemeterize);
   }
 
-  private void configureBindings() {
-    joystick.x().onTrue(Commands.runOnce(() -> System.out.println("X Button - Speaker Nav (test)")));
-    joystick.y().onTrue(Commands.runOnce(() -> System.out.println("Y Button - Amp Nav (test)")));
-    joystick.b().onTrue(Commands.runOnce(() -> System.out.println("B Button - Source Nav (test)")));
-    joystick.a().onTrue(Commands.runOnce(() -> System.out.println("A Button - Cancel Nav (test)")));
+private void configureBindings() {
+    // ============ LB: Toggle Robot <-> Field Centric (auto-seed on Field) ============
+    joystick.leftBumper().onTrue(Commands.runOnce(() -> {
+        isFieldCentric = !isFieldCentric;
+        System.out.println("Drive mode: " + (isFieldCentric ? "Field" : "Robot") + " centric");
+        if (isFieldCentric) {
+            // Seed operator perspective when entering field-centric
+            drivetrain.seedFieldCentric();
+        }
+    }));
 
-    joystick.leftBumper().and(joystick.a()).onTrue(new DriveToHomeCommand(drivetrain));
+    // ============ RB + A: Home (SAFE_POSE) | RB (hold): Brake (guarded) ============
+    // RB + A -> Home
+    joystick.rightBumper().and(joystick.a()).onTrue(new DriveToHomeCommand(drivetrain));
 
-    joystick.rightBumper().whileTrue(drivetrain.applyRequest(() -> brake));
-    joystick.leftTrigger().whileTrue(
-        drivetrain.applyRequest(() -> point.withModuleDirection(drivetrain.getState().Pose.getRotation())));
+    // RB (while held and A NOT held) -> Brake
+    joystick.rightBumper().and(joystick.a().negate())
+        .whileTrue(drivetrain.applyRequest(() -> brake));
 
-    // Zero field-centric heading
-    joystick.leftBumper().onTrue(drivetrain.runOnce(drivetrain::seedFieldCentric));
+    // ============ A: Cancel path -> brief brake (0.25s) -> manual ============
+    // Taking the drivetrain requirement will interrupt any active path following command.
+    joystick.a().and(joystick.rightBumper().negate()).onTrue(
+        Commands.sequence(
+            drivetrain.runOnce(() -> {}),                         // interrupt anything that requires drivetrain
+            drivetrain.applyRequest(() -> brake).withTimeout(0.25)
+        )
+    );
 
-    // SysId
-    joystick.back().and(joystick.povUp()).whileTrue(drivetrain.sysIdDynamic(Direction.kForward));
-    joystick.back().and(joystick.povDown()).whileTrue(drivetrain.sysIdDynamic(Direction.kReverse));
-    joystick.start().and(joystick.povUp()).whileTrue(drivetrain.sysIdQuasistatic(Direction.kForward));
-    joystick.start().and(joystick.povDown()).whileTrue(drivetrain.sysIdQuasistatic(Direction.kReverse));
-  }
+    // ============ B (hold): Point wheels toward left-stick direction ============
+    joystick.b().whileTrue(
+        drivetrain.applyRequest(() -> {
+            double x = -joystick.getLeftX();
+            double y = -joystick.getLeftY();
+            double mag = Math.hypot(x, y);
+            Rotation2d dir = (mag > 0.10)
+                ? new Rotation2d(Math.atan2(y, x))
+                : drivetrain.getState().Pose.getRotation(); // stable if stick is near zero
+            return point.withModuleDirection(dir);
+        })
+    );
+
+    // ============ X: Align 2 ft (0.6096 m) in front of Tag #2 ============
+    // Vision-preferred hook: if you have a vision wrapper, grab a live tag pose here; else layout fallback.
+    joystick.x().onTrue(Commands.defer(() -> {
+        var tagPoseOpt = AprilTagConstants.FIELD_LAYOUT.getTagPose(2);
+        if (tagPoseOpt.isEmpty()) {
+            return Commands.print("Tag 2 not found in field layout");
+        }
+
+        var tag = tagPoseOpt.get().toPose2d();
+
+        // 0.6096 m in front of the tag (negative X in tag frame), face the tag (180° from tag’s heading)
+        double d = 0.6096;
+        Pose2d target = new Pose2d(
+            tag.getX() - d * Math.cos(tag.getRotation().getRadians()),
+            tag.getY() - d * Math.sin(tag.getRotation().getRadians()),
+            tag.getRotation().rotateBy(Rotation2d.k180deg)
+        );
+
+        return AutoBuilder.pathfindToPose(target, PathPlannerUtils.getDefaultPathConstraints());
+    }, Set.of(drivetrain)));
+    // (AutoBuilder.pathfindToPose is the recommended PathPlanner call for this use case.) :contentReference[oaicite:0]{index=0}
+
+    // ============ Y: Move to SAFE_POSE (3.0, 3.0, 0°) ============
+    joystick.y().onTrue(new DriveToHomeCommand(drivetrain));
+}
+
 
   private void configurePathPlanner() {
     RobotConfig cfg;
