@@ -9,6 +9,12 @@ import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;   // <— NEW
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+import edu.wpi.first.math.MathUtil;
+/**
+ * Telemetry class for publishing swerve drive data to NetworkTables and SmartDashboard.
+ * This class handles the publishing of the robot's pose, module states, and module positions.
+ */
 
 public class Telemetry {
     private final double m_maxSpeed;
@@ -35,5 +41,18 @@ public class Telemetry {
         if (m_field != null) {
             m_field.setRobotPose(state.Pose);          // <— THIS DRAWS THE ROBOT
         }
-    }
+        // Per-module angle debug to SmartDashboard
+        String[] names = { "FL", "FR", "BL", "BR" };
+        for (int i = 0; i < 4; ++i) {
+            double desiredDeg  = state.ModuleTargets[i].angle.getDegrees();
+            double measuredDeg = state.ModuleStates[i].angle.getDegrees();
+            double deltaDeg    = MathUtil.inputModulus(desiredDeg - measuredDeg, -180.0, 180.0);
+
+            SmartDashboard.putNumber("Swerve/" + names[i] + "/DesiredDeg",  desiredDeg);
+            SmartDashboard.putNumber("Swerve/" + names[i] + "/MeasuredDeg", measuredDeg);
+            SmartDashboard.putNumber("Swerve/" + names[i] + "/DeltaDeg",    deltaDeg);
+        }
+
+        }
+    
 }

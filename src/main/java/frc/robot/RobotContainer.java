@@ -49,6 +49,17 @@ public class RobotContainer {
       .withDriveRequestType(DriveRequestType.OpenLoopVoltage);
   private final SwerveRequest.SwerveDriveBrake brake = new SwerveRequest.SwerveDriveBrake();
   private final SwerveRequest.PointWheelsAt point = new SwerveRequest.PointWheelsAt();
+  // Simple deterministic test motions (40% speed/rate)
+  private final SwerveRequest.RobotCentric testForward  = new SwerveRequest.RobotCentric()
+      .withVelocityX(MaxSpeed * 0.4).withVelocityY(0).withRotationalRate(0);
+  private final SwerveRequest.RobotCentric testBackward = new SwerveRequest.RobotCentric()
+      .withVelocityX(-MaxSpeed * 0.4).withVelocityY(0).withRotationalRate(0);
+  private final SwerveRequest.RobotCentric testRight    = new SwerveRequest.RobotCentric()
+      .withVelocityX(0).withVelocityY(-MaxSpeed * 0.4).withRotationalRate(0);
+  private final SwerveRequest.RobotCentric testLeft     = new SwerveRequest.RobotCentric()
+      .withVelocityX(0).withVelocityY(MaxSpeed * 0.4).withRotationalRate(0);
+  private final SwerveRequest.RobotCentric testRotate   = new SwerveRequest.RobotCentric()
+      .withVelocityX(0).withVelocityY(0).withRotationalRate(MaxAngularRate * 0.4);
 
   private final Field2d field = new Field2d();           // Field widget
   private final Telemetry logger;                        // <-- declare only
@@ -176,9 +187,29 @@ private void configureBindings() {
         return AutoBuilder.pathfindToPose(target, PathPlannerUtils.getDefaultPathConstraints());
     }, Set.of(drivetrain)));
     // (AutoBuilder.pathfindToPose is the recommended PathPlanner call for this use case.) :contentReference[oaicite:0]{index=0}
-
     // ============ Y: Move to SAFE_POSE (3.0, 3.0, 0°) ============
     joystick.y().onTrue(new DriveToHomeCommand(drivetrain));
+    //REMOVE ALL THETEMP BINDINGS BELOW HERE ONLY FOR TESING REMOVE - CAL
+    // D-pad = clean, repeatable tests (great on blocks)
+    joystick.povUp().whileTrue   (drivetrain.applyRequest(() -> testForward));
+    joystick.povDown().whileTrue (drivetrain.applyRequest(() -> testBackward));
+    joystick.povRight().whileTrue(drivetrain.applyRequest(() -> testRight));
+    joystick.povLeft().whileTrue (drivetrain.applyRequest(() -> testLeft));
+
+    // Hold Right Trigger to spin in place
+    joystick.rightTrigger().whileTrue(drivetrain.applyRequest(() -> testRotate));
+
+    // Hold BACK + (A/B/X/Y) to point wheels to cardinals
+    joystick.back().and(joystick.a()).whileTrue(drivetrain.applyRequest(
+        () -> point.withModuleDirection(Rotation2d.fromDegrees(0))));
+    joystick.back().and(joystick.b()).whileTrue(drivetrain.applyRequest(
+        () -> point.withModuleDirection(Rotation2d.fromDegrees(90))));
+    joystick.back().and(joystick.x()).whileTrue(drivetrain.applyRequest(
+        () -> point.withModuleDirection(Rotation2d.fromDegrees(180))));
+    joystick.back().and(joystick.y()).whileTrue(drivetrain.applyRequest(
+        () -> point.withModuleDirection(Rotation2d.fromDegrees(-90))));
+
+
 }
 
 
