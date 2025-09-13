@@ -29,6 +29,7 @@ import frc.robot.commands.SimpleAutonomousCommand;
 import frc.robot.constants.AprilTagConstants;
 import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
+import frc.robot.subsystems.VisionSubsystem;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
@@ -65,6 +66,7 @@ public class RobotContainer {
   private final Telemetry logger;                        // <-- declare only
 
   public final CommandSwerveDrivetrain drivetrain = TunerConstants.createDrivetrain();
+  public final VisionSubsystem visionSubsystem = new VisionSubsystem();
   private final CommandXboxController joystick = new CommandXboxController(0);
 
   private SendableChooser<Command> autoChooser;
