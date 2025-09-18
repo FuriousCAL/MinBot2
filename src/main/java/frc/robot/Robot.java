@@ -4,6 +4,7 @@
 
 package frc.robot;
 
+import frc.robot.constants.AprilTagConstants;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
@@ -26,6 +27,8 @@ public class Robot extends TimedRobot {
     @Override
     public void robotInit() {
         m_robotContainer = new RobotContainer();
+        // Zero heading at startup to 0° using HOME_POSITION's rotation
+        m_robotContainer.drivetrain.resetPose(AprilTagConstants.HOME_POSITION);
     }
 
     /**
@@ -38,6 +41,9 @@ public class Robot extends TimedRobot {
         
         // Update basic robot telemetry
         updateTelemetry();
+        
+        // Update vision pose fusion - this is the missing piece!
+        updateVisionFusion();
     }
 
     /**
@@ -46,6 +52,21 @@ public class Robot extends TimedRobot {
     private void updateTelemetry() {
         double yawDeg = m_robotContainer.drivetrain.getPose().getRotation().getDegrees();
         SmartDashboard.putNumber("Robot Yaw (degrees)", yawDeg);
+    }
+
+    /**
+     * Updates vision pose fusion - the critical missing piece!
+     * This fuses vision measurements with drivetrain odometry for better accuracy.
+     */
+    private void updateVisionFusion() {
+        m_robotContainer.visionSubsystem.getLatestEstimatedPose().ifPresent(estimatedPose -> {
+            // Add vision measurement to drivetrain's pose estimator
+            m_robotContainer.drivetrain.addVisionMeasurement(
+                estimatedPose.estimatedPose.toPose2d(),
+                estimatedPose.timestampSeconds,
+                m_robotContainer.visionSubsystem.getVisionMeasurementStdDevs()
+            );
+        });
     }
 
     /**
