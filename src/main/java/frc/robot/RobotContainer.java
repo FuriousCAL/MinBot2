@@ -106,16 +106,24 @@ public class RobotContainer {
         double scale     = MathUtil.clamp(precision * turbo, 0.2, 1.5);
 
         // Call the concrete request type (avoid the NativeSwerveRequest parent)
+        double rightX = joystick.getRightX();
+        double rotationRate = rightX * MaxAngularRate * scale;
+        
+        // Debug: Print rotation values
+        if (Math.abs(rightX) > 0.1) {
+          System.out.println("Right stick X: " + rightX + ", Rotation rate: " + rotationRate);
+        }
+        
         if (isFieldCentric) {
           return fieldDrive
               .withVelocityX(joystick.getLeftY()  * -MaxSpeed         * scale)
               .withVelocityY(joystick.getLeftX()  * -MaxSpeed         * scale)
-              .withRotationalRate(joystick.getRightX() * MaxAngularRate * scale);
+              .withRotationalRate(rotationRate);
         } else {
           return drive
               .withVelocityX(joystick.getLeftY()  * -MaxSpeed         * scale)
               .withVelocityY(joystick.getLeftX()  * -MaxSpeed         * scale)
-              .withRotationalRate(joystick.getRightX() * MaxAngularRate * scale);
+              .withRotationalRate(rotationRate);
         }
       })
 
