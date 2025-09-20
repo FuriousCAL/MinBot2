@@ -24,6 +24,7 @@ import com.pathplanner.lib.controllers.PPHolonomicDriveController;
 import com.pathplanner.lib.config.PIDConstants;
 
 import frc.robot.commands.DriveToAprilTagCommand;
+import frc.robot.commands.DriveToAprilTag2Command;
 import frc.robot.commands.DriveToHomeCommand;
 import frc.robot.commands.SimpleAutonomousCommand;
 import frc.robot.commands.VisionAssistedAprilTagCommand;
@@ -244,6 +245,10 @@ private void configureBindings() {
     
     // D-pad Down: Emergency home (backup for Y button)
     joystick.povDown().onTrue(new DriveToHomeCommand(drivetrain));
+
+    // === VISION TESTING ===
+    // Start button: Simple drive to AprilTag 2 (for testing vision integration)
+    joystick.start().onTrue(new DriveToAprilTag2Command(drivetrain, visionSubsystem));
 
     // === SAFETY COMBINATIONS (Following elite team patterns) ===
     // RB + X: Enhanced precision vision-assisted Tag #2 (main scoring position)

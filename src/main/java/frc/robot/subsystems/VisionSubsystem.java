@@ -13,6 +13,7 @@ import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import edu.wpi.first.cameraserver.CameraServer;
 
 import org.photonvision.EstimatedRobotPose;
 import org.photonvision.PhotonCamera;
@@ -104,7 +105,49 @@ public class VisionSubsystem extends SubsystemBase {
         // Configure pose estimator settings
         poseEstimator.setMultiTagFallbackStrategy(PoseStrategy.LOWEST_AMBIGUITY);
         
+        // Initialize camera stream for Shuffleboard
+        initializeCameraStream();
+        
         System.out.println("[VisionSubsystem] Initialized with camera: " + Constants.Vision.PRIMARY_CAMERA_NAME);
+    }
+    
+    // ==========================================================================
+    // CAMERA STREAM INITIALIZATION
+    // ==========================================================================
+    
+    /**
+     * Initializes camera stream for Shuffleboard display.
+     * This allows you to see what the robot sees in real-time.
+     */
+    private void initializeCameraStream() {
+        try {
+            // Method 1: Use WPILib CameraServer (recommended for Shuffleboard)
+            // Note: PhotonVision handles its own camera server, so we'll use their stream
+            CameraServer.startAutomaticCapture(0); // Use camera 0 for raw stream
+            
+            // Method 2: Access PhotonVision stream directly via NetworkTables
+            // This gives you access to the processed stream with AprilTag overlays
+            String cameraName = Constants.Vision.PRIMARY_CAMERA_NAME;
+            String streamUrl = String.format("http://192.168.86.30:5800/api/cameras/%s/stream", cameraName);
+            
+            System.out.println("[VisionSubsystem] Camera stream initialized for Shuffleboard");
+            System.out.println("[VisionSubsystem] WPILib raw stream: http://roborio-XXX-frc.local:1182/stream.mjpg");
+            System.out.println("[VisionSubsystem] PhotonVision processed stream: " + streamUrl);
+            System.out.println("[VisionSubsystem] PhotonVision dashboard: http://192.168.86.30:5800/#/camera");
+            
+        } catch (Exception e) {
+            System.err.println("[VisionSubsystem] Failed to initialize camera stream: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Gets the PhotonVision camera stream URL for external access.
+     * 
+     * @return URL to the camera stream with AprilTag overlays
+     */
+    public String getCameraStreamUrl() {
+        String cameraName = Constants.Vision.PRIMARY_CAMERA_NAME;
+        return String.format("http://192.168.86.30:5800/api/cameras/%s/stream", cameraName);
     }
     
     // ==========================================================================
@@ -384,6 +427,10 @@ public class VisionSubsystem extends SubsystemBase {
         } else {
             SmartDashboard.putNumber("Vision/Best Target ID", -1);
         }
+        
+        // Camera stream information
+        SmartDashboard.putString("Vision/Camera Stream URL", getCameraStreamUrl());
+        SmartDashboard.putString("Vision/PhotonVision Dashboard", "http://192.168.86.30:5800/#/camera");
     }
     
     /**
