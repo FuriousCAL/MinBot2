@@ -121,22 +121,29 @@ public class VisionSubsystem extends SubsystemBase {
      */
     private void initializeCameraStream() {
         try {
-            // Method 1: Use WPILib CameraServer (recommended for Shuffleboard)
-            // Note: PhotonVision handles its own camera server, so we'll use their stream
-            CameraServer.startAutomaticCapture(0); // Use camera 0 for raw stream
+            // Method 1: Try to start WPILib camera server
+            try {
+                CameraServer.startAutomaticCapture(0);
+                System.out.println("[VisionSubsystem] WPILib camera server started on camera 0");
+            } catch (Exception e) {
+                System.out.println("[VisionSubsystem] WPILib camera server failed: " + e.getMessage());
+            }
             
             // Method 2: Access PhotonVision stream directly via NetworkTables
             // This gives you access to the processed stream with AprilTag overlays
             String cameraName = Constants.Vision.PRIMARY_CAMERA_NAME;
             String streamUrl = String.format("http://192.168.86.30:5800/api/cameras/%s/stream", cameraName);
             
-            System.out.println("[VisionSubsystem] Camera stream initialized for Shuffleboard");
-            System.out.println("[VisionSubsystem] WPILib raw stream: http://roborio-XXX-frc.local:1182/stream.mjpg");
-            System.out.println("[VisionSubsystem] PhotonVision processed stream: " + streamUrl);
-            System.out.println("[VisionSubsystem] PhotonVision dashboard: http://192.168.86.30:5800/#/camera");
+            System.out.println("[VisionSubsystem] Camera stream initialization complete");
+            System.out.println("[VisionSubsystem] Available streams:");
+            System.out.println("  - WPILib raw stream: http://roborio-XXX-frc.local:1182/stream.mjpg");
+            System.out.println("  - PhotonVision processed stream: " + streamUrl);
+            System.out.println("  - PhotonVision dashboard: http://192.168.86.30:5800/#/camera");
+            System.out.println("[VisionSubsystem] Add these URLs to Shuffleboard manually if needed");
             
         } catch (Exception e) {
             System.err.println("[VisionSubsystem] Failed to initialize camera stream: " + e.getMessage());
+            System.out.println("[VisionSubsystem] You can still access the PhotonVision dashboard at: http://192.168.86.30:5800/#/camera");
         }
     }
     
@@ -431,6 +438,13 @@ public class VisionSubsystem extends SubsystemBase {
         // Camera stream information
         SmartDashboard.putString("Vision/Camera Stream URL", getCameraStreamUrl());
         SmartDashboard.putString("Vision/PhotonVision Dashboard", "http://192.168.86.30:5800/#/camera");
+        
+        // Camera stream instructions for manual setup
+        SmartDashboard.putString("Vision/Setup Instructions", 
+            "1. Open Shuffleboard\n" +
+            "2. Add Camera Stream widget\n" +
+            "3. Use URL: http://192.168.86.30:5800/api/cameras/ArduCam1/stream\n" +
+            "4. Or visit: http://192.168.86.30:5800/#/camera");
     }
     
     /**
