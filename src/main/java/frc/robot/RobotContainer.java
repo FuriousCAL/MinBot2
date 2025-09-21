@@ -2,12 +2,9 @@ package frc.robot;
 
 import static edu.wpi.first.units.Units.*;
 
-import java.util.Set;
-
 import com.ctre.phoenix6.swerve.SwerveModule.DriveRequestType;
 import com.ctre.phoenix6.swerve.SwerveRequest;
 
-import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
@@ -16,14 +13,12 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
-import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine.Direction;
 
 import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.config.RobotConfig;
 import com.pathplanner.lib.controllers.PPHolonomicDriveController;
 import com.pathplanner.lib.config.PIDConstants;
 
-import frc.robot.commands.DriveToAprilTagCommand;
 import frc.robot.commands.DriveToAprilTag2Command;
 import frc.robot.commands.DriveToHomeCommand;
 import frc.robot.commands.SimpleAutonomousCommand;
@@ -33,14 +28,7 @@ import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
 import frc.robot.subsystems.VisionSubsystem;
 import edu.wpi.first.math.MathUtil;
-import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
-import edu.wpi.first.math.geometry.Translation2d;
-import edu.wpi.first.math.geometry.Transform2d;
-
-import com.pathplanner.lib.auto.AutoBuilder; // used below for X/Y moves
-import frc.robot.utils.PathPlannerUtils;      // for default PathPlanner constraints
-import edu.wpi.first.apriltag.AprilTagFields;
 
 public class RobotContainer {
   private final double MaxSpeed = TunerConstants.kSpeedAt12Volts.in(MetersPerSecond);
@@ -108,7 +96,7 @@ public class RobotContainer {
 
         // Call the concrete request type (avoid the NativeSwerveRequest parent)
         double rightX = joystick.getRightX();
-        double rotationRate = rightX * MaxAngularRate * scale;
+        double rotationRate = -rightX * MaxAngularRate * scale; // Invert for correct rotation direction
         
         // Debug: Print rotation values
         if (Math.abs(rightX) > 0.1) {
@@ -165,34 +153,30 @@ public class RobotContainer {
   }
 
 private void configureBindings() {
-    // ============ LB: Toggle Robot <-> Field Centric (auto-seed on Field) ============
+    // ============================================================================
+    // PROFESSIONAL FRC TEAM CONTROLLER LAYOUT (Following 254/971/1678 patterns)
+    // ============================================================================
+    
+    // === CORE DRIVING CONTROLS ===
+    // Left Bumper: Toggle Field/Robot Centric (industry standard)
     joystick.leftBumper().onTrue(Commands.runOnce(() -> {
         isFieldCentric = !isFieldCentric;
         System.out.println("Drive mode: " + (isFieldCentric ? "Field" : "Robot") + " centric");
         if (isFieldCentric) {
-            // Seed operator perspective when entering field-centric
             drivetrain.seedFieldCentric();
         }
     }));
 
-    // ============ RB + A: Home (SAFE_POSE) | RB (hold): Brake (guarded) ============
-    // RB + A -> Home
-    joystick.rightBumper().and(joystick.a()).onTrue(new DriveToHomeCommand(drivetrain));
+    // Right Bumper: Brake mode (hold to brake, industry standard)
+    joystick.rightBumper().whileTrue(drivetrain.applyRequest(() -> brake));
 
-    // RB (while held and A NOT held) -> Brake
-    joystick.rightBumper().and(joystick.a().negate())
-        .whileTrue(drivetrain.applyRequest(() -> brake));
+    // A Button: Cancel all commands and return to manual control
+    joystick.a().onTrue(Commands.sequence(
+        drivetrain.runOnce(() -> {}), // Cancel any active commands
+        drivetrain.applyRequest(() -> brake).withTimeout(0.25)
+    ));
 
-    // ============ A: Cancel path -> brief brake (0.25s) -> manual ============
-    // Taking the drivetrain requirement will interrupt any active path following command.
-    joystick.a().and(joystick.rightBumper().negate()).onTrue(
-        Commands.sequence(
-            drivetrain.runOnce(() -> {}),                         // interrupt anything that requires drivetrain
-            drivetrain.applyRequest(() -> brake).withTimeout(0.25)
-        )
-    );
-
-    // ============ B (hold): Point wheels toward left-stick direction ============
+    // B Button: Point wheels toward left stick direction (precision alignment)
     joystick.b().whileTrue(
         drivetrain.applyRequest(() -> {
             double x = -joystick.getLeftX();
@@ -200,66 +184,46 @@ private void configureBindings() {
             double mag = Math.hypot(x, y);
             Rotation2d dir = (mag > 0.10)
                 ? new Rotation2d(Math.atan2(y, x))
-                : drivetrain.getState().Pose.getRotation(); // stable if stick is near zero
+                : drivetrain.getState().Pose.getRotation();
             return point.withModuleDirection(dir);
         })
     );
 
-    // ============ X: Align 2 ft (0.6096 m) in front of Tag #2 ============
-    // Vision-preferred hook: if you have a vision wrapper, grab a live tag pose here; else layout fallback.
-    joystick.x().onTrue(Commands.defer(() -> {
-        var tagPoseOpt = AprilTagConstants.FIELD_LAYOUT.getTagPose(2);
-        if (tagPoseOpt.isEmpty()) {
-            return Commands.print("Tag 2 not found in field layout");
-        }
+    // === VISION-ASSISTED NAVIGATION (Button Combinations) ===
+    // X + Y: Drive to AprilTag 2 (Speaker, main scoring position)
+    joystick.x().and(joystick.y()).onTrue(new DriveToAprilTag2Command(drivetrain, visionSubsystem));
+    
+    // X + B: Drive to AprilTag 1 (Blue alliance scoring)
+    joystick.x().and(joystick.b()).onTrue(new VisionAssistedAprilTagCommand(drivetrain, visionSubsystem, 1));
+    
+    // Y + B: Drive to AprilTag 3 (Amp side)
+    joystick.y().and(joystick.b()).onTrue(new VisionAssistedAprilTagCommand(drivetrain, visionSubsystem, 3));
+    
+    // X + A: Drive to AprilTag 4 (Source side)
+    joystick.x().and(joystick.a()).onTrue(new VisionAssistedAprilTagCommand(drivetrain, visionSubsystem, 4));
 
-        var tag = tagPoseOpt.get().toPose2d();
-
-        // 0.6096 m in front of the tag (negative X in tag frame), face the tag (180° from tag’s heading)
-        double d = 0.6096;
-        Pose2d target = new Pose2d(
-            tag.getX() - d * Math.cos(tag.getRotation().getRadians()),
-            tag.getY() - d * Math.sin(tag.getRotation().getRadians()),
-            tag.getRotation().rotateBy(Rotation2d.k180deg)
-        );
-
-        return AutoBuilder.pathfindToPose(target, PathPlannerUtils.getDefaultPathConstraints());
-    }, Set.of(drivetrain)));
-    // (AutoBuilder.pathfindToPose is the recommended PathPlanner call for this use case.) :contentReference[oaicite:0]{index=0}
-    // ============ Y: Move to SAFE_POSE (3.0, 3.0, 0°) ============
+    // === SAFETY AND UTILITY ===
+    // Y Button: Return to home position (safe zone)
     joystick.y().onTrue(new DriveToHomeCommand(drivetrain));
-    //REMOVE ALL THETEMP BINDINGS BELOW HERE ONLY FOR TESING REMOVE - CAL
-    // ============================================================================
-    // ELITE FRC TEAM CONTROLLER LAYOUT (Following 254/971/1678 patterns)
-    // ============================================================================
     
-    // === ADVANCED NAVIGATION (D-PAD) ===
-    // D-pad Up: Vision-Assisted AprilTag #1 (blue alliance scoring)
-    joystick.povUp().onTrue(new VisionAssistedAprilTagCommand(drivetrain, visionSubsystem, 1));
-    
-    // D-pad Left: Vision-Assisted AprilTag #3 (amp side)
-    joystick.povLeft().onTrue(new VisionAssistedAprilTagCommand(drivetrain, visionSubsystem, 3));
-    
-    // D-pad Right: Vision-Assisted AprilTag #4 (source side)  
-    joystick.povRight().onTrue(new VisionAssistedAprilTagCommand(drivetrain, visionSubsystem, 4));
-    
-    // D-pad Down: Emergency home (backup for Y button)
-    joystick.povDown().onTrue(new DriveToHomeCommand(drivetrain));
-
-    // === VISION TESTING ===
-    // Start button: Simple drive to AprilTag 2 (for testing vision integration)
+    // Start Button: Vision system test (drive to AprilTag 2 with simple PID)
     joystick.start().onTrue(new DriveToAprilTag2Command(drivetrain, visionSubsystem));
+    
+    // Back Button: Emergency home (backup safety)
+    joystick.back().onTrue(new DriveToHomeCommand(drivetrain));
 
-    // === SAFETY COMBINATIONS (Following elite team patterns) ===
-    // RB + X: Enhanced precision vision-assisted Tag #2 (main scoring position)
-    joystick.rightBumper().and(joystick.x()).onTrue(
-        new VisionAssistedAprilTagCommand(drivetrain, visionSubsystem, 2)
-    );
+    // === D-PAD: QUICK NAVIGATION (Optional) ===
+    // D-pad Up: Quick home return
+    joystick.povUp().onTrue(new DriveToHomeCommand(drivetrain));
+    
+    // D-pad Down: Vision test (same as Start)
+    joystick.povDown().onTrue(new DriveToAprilTag2Command(drivetrain, visionSubsystem));
 
-    System.out.println("[Controller] Industry-standard FRC controller layout loaded");
-    System.out.println("  Face buttons: A=Cancel, B=Point, X=Tag2, Y=Home");  
-    System.out.println("  D-pad: Up=Tag1, Left=Tag3, Right=Tag4, Down=EmergencyHome");
-    System.out.println("  Combinations: RB+A=Home, RB+X=PrecisionTag2, RB(hold)=Brake");
+    System.out.println("[Controller] Professional FRC team layout loaded");
+    System.out.println("  Core: LB=Toggle Mode, RB=Brake, A=Cancel, B=Point, Y=Home");
+    System.out.println("  Vision: X+Y=Tag2, X+B=Tag1, Y+B=Tag3, X+A=Tag4");
+    System.out.println("  Safety: Start=Vision Test, Back=Emergency Home");
+    System.out.println("  Rotation: Left stick = CCW, Right stick = CW");
 }
 
 
